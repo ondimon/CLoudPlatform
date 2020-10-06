@@ -1,0 +1,6 @@
+rootProject.name = 'CloudPlatform'
+
+include 'Server'
+include 'Client'
+include 'Common'
+
