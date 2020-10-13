@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.*?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<HBox alignment="CENTER" prefHeight="424.0" prefWidth="505.0" xmlns="http://javafx.com/javafx/11.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="ControllerFileManager">
+   <children>
+
+      <VBox HBox.hgrow="ALWAYS">
+         <children>
+            <ToolBar prefHeight="22.0" prefWidth="256.0">
+              <items>
+                  <TextField fx:id="pathDir" editable="false" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" opacity="0.5" />
+                <Button maxHeight="1.7976931348623157E308" mnemonicParsing="false" onAction="#directoryChoose" text="..." />
+              </items>
+            </ToolBar>
+            <Label text="Client files" />
+            <ListView fx:id="clientFiles" prefHeight="312.0" prefWidth="256.0" VBox.vgrow="ALWAYS" />
+         </children>
+      </VBox>
+       <VBox alignment="CENTER" minWidth="-Infinity" prefHeight="424.0" prefWidth="40.0" HBox.hgrow="NEVER">
+         <children>
+            <Button fx:id="buttonUpload" mnemonicParsing="false" onAction="#buttonUploadOnAction" text="&gt;">
+               <VBox.margin>
+                  <Insets bottom="5.0" left="5.0" right="5.0" top="5.0" />
+               </VBox.margin>
+            </Button>
+            <Button fx:id="buttonDownload" mnemonicParsing="false" onAction="#buttonDownloadOnAction" text="&lt;">
+               <VBox.margin>
+                  <Insets bottom="5.0" left="5.0" right="5.0" top="5.0" />
+               </VBox.margin>
+            </Button>
+         </children></VBox>
+      <VBox HBox.hgrow="ALWAYS">
+         <children>
+            <ToolBar prefHeight="35.0" prefWidth="248.0" />
+            <Label text="Server files" />
+            <ListView fx:id="serverFiles" prefHeight="329.0" prefWidth="248.0" VBox.vgrow="ALWAYS" />
+         </children>
+      </VBox>
+   </children>
+</HBox>

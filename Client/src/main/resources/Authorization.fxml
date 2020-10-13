@@ -4,24 +4,28 @@
 <?import javafx.scene.layout.*?>
 <?import javafx.scene.text.*?>
 
-<AnchorPane prefHeight="273.0" prefWidth="391.0" xmlns="http://javafx.com/javafx/11.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="ControllerAuthorization">
+<Pane xmlns="http://javafx.com/javafx/11.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="ControllerAuthorization">
    <children>
-      <Label layoutX="64.0" layoutY="50.0" prefHeight="31.0" prefWidth="73.0" text="LOGIN">
-         <font>
-            <Font name="System Bold" size="18.0" />
-         </font>
-      </Label>
-      <Label layoutX="63.0" layoutY="116.0" prefHeight="27.0" prefWidth="266.0" text="PASSWORD">
-         <font>
-            <Font name="System Bold" size="18.0" />
-         </font>
-      </Label>
-      <TextField fx:id="loginField" layoutX="63.0" layoutY="81.0" prefHeight="25.0" prefWidth="266.0" />
-      <PasswordField fx:id="passwordField" layoutX="64.0" layoutY="143.0" prefHeight="25.0" prefWidth="266.0" />
-      <Button fx:id="loginButton" layoutX="115.0" layoutY="188.0" mnemonicParsing="false" onAction="#logIn" prefHeight="25.0" prefWidth="165.0" text="LOG IN">
-         <font>
-            <Font name="System Bold" size="18.0" />
-         </font>
-      </Button>
+      <AnchorPane prefHeight="273.0" prefWidth="391.0">
+         <children>
+            <Label layoutX="64.0" layoutY="50.0" prefHeight="31.0" prefWidth="73.0" text="LOGIN">
+               <font>
+                  <Font name="System Bold" size="18.0" />
+               </font>
+            </Label>
+            <Label layoutX="63.0" layoutY="116.0" prefHeight="27.0" prefWidth="266.0" text="PASSWORD">
+               <font>
+                  <Font name="System Bold" size="18.0" />
+               </font>
+            </Label>
+            <TextField fx:id="loginField" layoutX="63.0" layoutY="81.0" prefHeight="25.0" prefWidth="266.0" />
+            <PasswordField fx:id="passwordField" layoutX="64.0" layoutY="143.0" prefHeight="25.0" prefWidth="266.0" />
+            <Button fx:id="loginButton" layoutX="115.0" layoutY="188.0" mnemonicParsing="false" onAction="#logIn" prefHeight="25.0" prefWidth="165.0" text="LOG IN">
+               <font>
+                  <Font name="System Bold" size="18.0" />
+               </font>
+            </Button>
+         </children>
+      </AnchorPane>
    </children>
-</AnchorPane>
+</Pane>

@@ -4,7 +4,12 @@ import io.netty.channel.ChannelInboundHandlerAdapter;
 
 public class MessageHandler extends ChannelInboundHandlerAdapter {
 
-    private volatile Channel channel;
+    private Channel channel;
+    private Callback callback;
+
+    public void setCallback(Callback callback) {
+        this.callback = callback;
+    }
 
     public void sendMessage(Message message) {
         channel.writeAndFlush(message);
@@ -22,7 +27,12 @@ public class MessageHandler extends ChannelInboundHandlerAdapter {
 
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) {
+        System.out.println("new message from server");
         System.out.println(msg.toString());
+
+        if(callback != null) {
+            callback.setMessage((Message) msg);
+        }
     }
 
 
