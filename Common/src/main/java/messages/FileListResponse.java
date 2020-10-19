@@ -1,3 +1,5 @@
+package messages;
+
 import java.util.List;
 
 public class FileListResponse extends Message {

@@ -1,12 +1,10 @@
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.socket.SocketChannel;
-import io.netty.handler.codec.LineBasedFrameDecoder;
 import io.netty.handler.codec.serialization.ClassResolvers;
 import io.netty.handler.codec.serialization.ObjectDecoder;
 import io.netty.handler.codec.serialization.ObjectEncoder;
 import io.netty.handler.ssl.SslContext;
-import io.netty.handler.stream.ChunkedWriteHandler;
 
 public class ServerInitializer extends ChannelInitializer<SocketChannel> {
 
@@ -28,7 +26,7 @@ public class ServerInitializer extends ChannelInitializer<SocketChannel> {
         p.addLast(
                 new ObjectEncoder(),
                 new ObjectDecoder(ClassResolvers.cacheDisabled(null)),
-                new ChunkedWriteHandler(),
-                new MessageLoginHandler(server));
+                new MessageServerHandler(server)
+        );
     }
 }

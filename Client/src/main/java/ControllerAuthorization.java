@@ -1,3 +1,4 @@
+import messages.LoginRequest;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
@@ -8,12 +9,11 @@ import javafx.scene.control.Alert;
 import javafx.scene.control.PasswordField;
 import javafx.scene.control.TextField;
 import javafx.stage.Stage;
+import messages.LoginResponse;
 
 import java.io.IOException;
 import java.net.URL;
 import java.util.ResourceBundle;
-import java.util.UUID;
-import java.util.concurrent.Callable;
 
 public class ControllerAuthorization implements Initializable {
     private SeverListener severListener;
@@ -28,16 +28,13 @@ public class ControllerAuthorization implements Initializable {
     public void initialize(URL location, ResourceBundle resources) {
         severListener = SeverListener.getInstance();
         severListener.setCallback(message -> {
-            System.out.println("call back");
-            System.out.println(message);
-            System.out.println(message  instanceof MessageLogin);
-            if(message  instanceof MessageLogin) {
-                MessageLogin messageLogin = (MessageLogin) message;
+            if(message  instanceof LoginResponse ) {
+                LoginResponse messageLogin = (LoginResponse) message;
                 if (messageLogin.isLoginSuccess()) {
                     severListener.setToken(messageLogin.getToken());
                     loadFileScreen(messageLogin);
                 }else{
-                    Platform.runLater(() -> new Alert(Alert.AlertType.ERROR, "Invalid login or password").show());
+                    Platform.runLater(() -> showAlertWindow("Invalid login or password"));
 
                 }
             }
@@ -49,12 +46,11 @@ public class ControllerAuthorization implements Initializable {
     public void logIn(javafx.event.ActionEvent actionEvent) {
         String login = loginField.getText();
         String pass = passwordField.getText();
-        MessageLogin messageLogin = new MessageLogin(login, pass);
+        LoginRequest messageLogin = new LoginRequest(login, pass);
         severListener.sendMessage(messageLogin);
     }
 
-    public void loadFileScreen(MessageLogin messageLogin) {
-//        final UUID uuid = messageLogin.getToken();
+    public void loadFileScreen(LoginResponse messageLogin) {
         Platform.runLater(new Runnable() {
             @Override
             public void run() {
@@ -85,7 +81,12 @@ public class ControllerAuthorization implements Initializable {
         });
     }
 
-    public void setSeverListener(SeverListener severListener) {
-
+    private void showAlertWindow(String text) {
+        Alert alert = new Alert(Alert.AlertType.INFORMATION);
+        alert.setTitle("Information");
+        alert.setHeaderText(null);
+        alert.setContentText(text);
+        alert.showAndWait();
     }
+
 }

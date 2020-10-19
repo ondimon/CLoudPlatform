@@ -1,6 +1,6 @@
-import java.io.Serializable;
+package messages;
 
-public final class MessageLogin extends Message {
+public class LoginRequest extends Message {
     private String login;
     private String password;
     private boolean loginSuccess;
@@ -13,7 +13,7 @@ public final class MessageLogin extends Message {
         this.loginSuccess = loginSuccess;
     }
 
-    public MessageLogin(String login, String password) {
+    public LoginRequest(String login, String password) {
         this.login = login;
         this.password = password;
         this.loginSuccess = false;
