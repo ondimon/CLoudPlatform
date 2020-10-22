@@ -128,6 +128,9 @@ public class MessageServerHandler extends ChannelInboundHandlerAdapter {
 
         FileLoader fileLoader = new FileLoader(path, fileHeader);
         fileLoader.setCallback((message) ->{
+            FileLoad fileLoad = (FileLoad) message;
+            FileHeader fileHeaderLoad  = fileLoad.getFileHeader();
+            unRegisterFileLoader(fileHeaderLoad);
             channel.writeAndFlush(message);
         });
         new Thread(fileLoader).start();
@@ -197,5 +200,10 @@ public class MessageServerHandler extends ChannelInboundHandlerAdapter {
 
     private void registerFileLoader(FileLoader fileLoader) {
         fileLoaders.put(fileLoader.getFileHeader().getUuid(), fileLoader);
+    }
+
+
+    public void unRegisterFileLoader(FileHeader fileHeader) {
+        fileLoaders.remove(fileHeader.getUuid());
     }
 }

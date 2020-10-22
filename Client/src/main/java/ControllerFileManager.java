@@ -80,21 +80,23 @@ public class ControllerFileManager implements Initializable {
     }
 
     public void updateClientFileList() {
-        clientFiles.getItems().clear();
-        String path = pathDir.getText();
-        if(path.equals("")) {
-            return;
-        }
-
-        ArrayList<String> listFiles = null;
-        try {
-            listFiles = FileUtility.getListFiles(Paths.get(path));
-            for(String fileName : listFiles) {
-                clientFiles.getItems().add(fileName);
+        Platform.runLater(() -> {
+            clientFiles.getItems().clear();
+            String path = pathDir.getText();
+            if(path.equals("")) {
+                return;
             }
-        } catch (IOException e) {
-            showAlertWindow(e.getMessage());
-        }
+
+            ArrayList<String> listFiles = null;
+            try {
+                listFiles = FileUtility.getListFiles(Paths.get(path));
+                for(String fileName : listFiles) {
+                    clientFiles.getItems().add(fileName);
+                }
+            } catch (IOException e) {
+                showAlertWindow(e.getMessage());
+            }
+        });
     }
 
     public void sendFileListRequest() {
@@ -106,7 +108,11 @@ public class ControllerFileManager implements Initializable {
     public void directoryChoose(ActionEvent actionEvent) {
         final DirectoryChooser directoryChooser = new DirectoryChooser();
         directoryChooser.setTitle("Select Directories");
-        //directoryChooser.setInitialDirectory();
+        String curDir = pathDir.getText();
+        if(! curDir.equals("")) {
+            directoryChooser.setInitialDirectory(new File(curDir));
+        }
+
         File dir = directoryChooser.showDialog(pathDir.getScene().getWindow());
         if (dir != null) {
             pathDir.setText(dir.getAbsolutePath());
@@ -145,7 +151,9 @@ public class ControllerFileManager implements Initializable {
                 if(message instanceof FileLoad) {
                     updateClientFileList();
                     FileLoad fileLoad = (FileLoad) message;
-                    removeProgress(serverRoot, fileLoad.getFileHeader());
+                    FileHeader fileHeaderLoad  = fileLoad.getFileHeader();
+                    removeProgress(serverRoot, fileHeaderLoad);
+                    severListener.unRegisterFileLoader(fileHeaderLoad);
                 }
             }));
         } catch (IOException e) {
