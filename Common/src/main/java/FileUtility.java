@@ -1,3 +1,5 @@
+import messages.FileHeader;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -13,6 +15,14 @@ public class FileUtility {
         fileList = (ArrayList<String>) Files.list(path)
                 .filter(p -> !Files.isDirectory(p))
                 .map(p -> p.getFileName().toString())
+                .collect(Collectors.toList());
+        return fileList;
+    }
+
+    public static ArrayList<FileHeader> getListFilesHeader(Path path) throws IOException {
+        ArrayList<FileHeader> fileList;
+        fileList = (ArrayList<FileHeader>) Files.list(path)
+                .map(p -> new FileHeader(p.getFileName().toString(), Files.isDirectory(p), p.toFile().length()))
                 .collect(Collectors.toList());
         return fileList;
     }

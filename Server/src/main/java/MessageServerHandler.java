@@ -77,8 +77,6 @@ public class MessageServerHandler extends ChannelInboundHandlerAdapter {
 
     }
 
-
-
     @Override
     public void channelReadComplete(ChannelHandlerContext ctx) {
         ctx.flush();
@@ -128,7 +126,18 @@ public class MessageServerHandler extends ChannelInboundHandlerAdapter {
 
         FileLoader fileLoader = new FileLoader(path, fileHeader);
         fileLoader.setCallback((message) ->{
+            FileLoad fileLoad = (FileLoad) message;
+            FileHeader fileHeaderLoad  = fileLoad.getFileHeader();
+            unRegisterFileLoader(fileHeaderLoad);
             channel.writeAndFlush(message);
+
+            try {
+                ArrayList<String> listFiles = FileUtility.getListFiles(server.getUserDir(user));
+                channel.writeAndFlush(new FileListResponse(listFiles));
+            } catch (IOException e) {
+                logger.error(e);
+            }
+
         });
         new Thread(fileLoader).start();
         registerFileLoader(fileLoader);
@@ -147,55 +156,16 @@ public class MessageServerHandler extends ChannelInboundHandlerAdapter {
         return new FileDownloadResponse(fileHeader);
     }
 
-//    private Messages.Message getFileResponseHandler(ChannelHandlerContext ctx, FileResponse msg) {
-//        try {
-//            Path path = Paths.get(server.getUserDir(user).toString(), msg.getFileName());
-//            logger.debug(path.toString());
-//            byte[] data = msg.getData();
-//            ByteBuffer byteBuffer= ByteBuffer.wrap(data);
-//
-//            logger.debug(data.length);
-//
-////            Set<StandardOpenOption> options = new HashSet<>();
-////            options.add(StandardOpenOption.CREATE);
-////            options.add(StandardOpenOption.APPEND);
-////            FileChannel fileChannel = FileChannel.open(path, options);
-////            fileChannel.write(byteBuffer);
-////            fileChannel.close();
-//
-//            if(Files.notExists(path)) {
-//                logger.debug("create file");
-//                Files.createFile(path);
-//           }
-//            RandomAccessFile randomAccessFile = new RandomAccessFile(path.toFile(), "rw");
-//            FileChannel fileChannel = randomAccessFile.getChannel();
-//
-//            while (byteBuffer.hasRemaining()){;
-//                fileChannel.position(path.toFile().length());
-//                fileChannel.write(byteBuffer);
-//            }
-//
-//            fileChannel.close();
-//            randomAccessFile.close();
-//
-////            try (FileChannel channel = new RandomAccessFile(path.toFile(), "rw").getChannel()) {
-////                logger.debug("write file");
-////                channel.write(ByteBuffer.wrap(msg.getData()), channel.size());
-////            }
-////            Files.write(path,
-////                        msg.getData(),
-////                        StandardOpenOption.APPEND);
-//        } catch (Exception e) {
-//           logger.error(e);
-//        }
-//        return null;
-//    }
-
     private boolean checkToken(Message msg) {
         return msg.getToken().equals(token);
     }
 
     private void registerFileLoader(FileLoader fileLoader) {
         fileLoaders.put(fileLoader.getFileHeader().getUuid(), fileLoader);
+    }
+
+
+    public void unRegisterFileLoader(FileHeader fileHeader) {
+        fileLoaders.remove(fileHeader.getUuid());
     }
 }

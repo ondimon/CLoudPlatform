@@ -33,6 +33,10 @@ public class MessageClientHandler extends ChannelInboundHandlerAdapter {
         fileLoaders.put(fileLoader.getFileHeader().getUuid(), fileLoader);
     }
 
+    public void unRegisterFileLoader(FileHeader fileHeader) {
+        fileLoaders.remove(fileHeader.getUuid());
+    }
+
     @Override
     public void channelRegistered(ChannelHandlerContext ctx) {
         channel = ctx.channel();

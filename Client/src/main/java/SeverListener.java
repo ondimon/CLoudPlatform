@@ -1,4 +1,5 @@
 import filetransfer.FileLoader;
+import messages.FileHeader;
 import messages.Message;
 import callback.Callback;
 import io.netty.bootstrap.Bootstrap;
@@ -52,6 +53,10 @@ public class SeverListener implements Runnable  {
 
     public void registerFileLoader(FileLoader fileLoader) {
         messageClientHandler.registerFileLoader(fileLoader);
+    }
+
+    public void unRegisterFileLoader(FileHeader fileHeader) {
+        messageClientHandler.unRegisterFileLoader(fileHeader);
     }
 
     public void sendMessage(Message message) {

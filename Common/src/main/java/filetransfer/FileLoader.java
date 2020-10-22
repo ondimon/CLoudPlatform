@@ -18,13 +18,7 @@ public class FileLoader implements Runnable {
     private static final Logger logger = LogManager.getLogger(FileLoader.class.getName());
 
     private Path path;
-
-
-
     private FileHeader fileHeader;
-
-
-
     private long fileLength;
     private long byteLoad;
     private ArrayBlockingQueue<byte[]> queue;

@@ -1,8 +1,14 @@
 import filetransfer.FileLoader;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
 import javafx.scene.Node;
 import javafx.scene.control.*;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.Pane;
 import javafx.scene.layout.VBox;
@@ -18,6 +24,7 @@ import org.apache.logging.log4j.Logger;
 
 import java.io.*;
 import java.net.URL;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -35,10 +42,11 @@ public class ControllerFileManager implements Initializable {
     ListView<String> serverFiles;
 
     @FXML
-    ListView<String> clientFiles;
+    ListView<FileHeader> clientFiles;
+    final ObservableList<FileHeader> clientFilesList = FXCollections.observableArrayList();
 
     @FXML
-    TextField pathDir;
+    TextField clientPathDir;
 
     @FXML
     Button buttonUpload;
@@ -54,18 +62,22 @@ public class ControllerFileManager implements Initializable {
 
     @Override
     public void initialize(URL location, ResourceBundle resources) {
+        clientPathDir.setText(System.getProperty("user.home", ""));
+        initializeClientFilesList();
+
         severListener = SeverListener.getInstance();
         severListener.setCallback(message -> {
             if(message instanceof FileListResponse ) {
                 updateServerFileList((FileListResponse) message);
             }else if(message instanceof FileLoad) {
-
-                sendFileListRequest();
-
                 FileLoad fileLoad = (FileLoad) message;
                 removeProgress(clientRoot, fileLoad.getFileHeader());
             }
         });
+
+        if(!clientPathDir.getText().equals("")) {
+            updateClientFileList();
+        }
 
         sendFileListRequest();
 
@@ -80,21 +92,24 @@ public class ControllerFileManager implements Initializable {
     }
 
     public void updateClientFileList() {
-        clientFiles.getItems().clear();
-        String path = pathDir.getText();
-        if(path.equals("")) {
-            return;
-        }
-
-        ArrayList<String> listFiles = null;
-        try {
-            listFiles = FileUtility.getListFiles(Paths.get(path));
-            for(String fileName : listFiles) {
-                clientFiles.getItems().add(fileName);
+        Platform.runLater(() -> {
+            clientFilesList.clear();
+            String path = clientPathDir.getText();
+            if(path.equals("")) {
+                return;
             }
-        } catch (IOException e) {
-            showAlertWindow(e.getMessage());
-        }
+
+            try {
+
+                ArrayList<FileHeader> fileList = FileUtility.getListFilesHeader(Paths.get(path));
+                clientFilesList.addAll(fileList);
+                FileHeader fileHeader = new FileHeader("...", true, 0);
+                clientFilesList.add(0, fileHeader);
+
+            } catch (IOException e) {
+                showAlertWindow(e.getMessage());
+            }
+        });
     }
 
     public void sendFileListRequest() {
@@ -106,19 +121,26 @@ public class ControllerFileManager implements Initializable {
     public void directoryChoose(ActionEvent actionEvent) {
         final DirectoryChooser directoryChooser = new DirectoryChooser();
         directoryChooser.setTitle("Select Directories");
-        //directoryChooser.setInitialDirectory();
-        File dir = directoryChooser.showDialog(pathDir.getScene().getWindow());
+        String curDir = clientPathDir.getText();
+        if(! curDir.equals("")) {
+            directoryChooser.setInitialDirectory(new File(curDir));
+        }
+
+        File dir = directoryChooser.showDialog(clientPathDir.getScene().getWindow());
         if (dir != null) {
-            pathDir.setText(dir.getAbsolutePath());
+            clientPathDir.setText(dir.getAbsolutePath());
         } else {
-            pathDir.setText(null);
+            clientPathDir.setText(null);
         }
         updateClientFileList();
     }
 
     public void buttonUploadOnAction(ActionEvent actionEvent) {
-        String fileName = clientFiles.getSelectionModel().getSelectedItem();
-        Path pathToFile = Paths.get(pathDir.getText(), fileName);
+        FileHeader fileName = clientFiles.getSelectionModel().getSelectedItem();
+        if(fileName.isFolder()) {
+            return;
+        }
+        Path pathToFile = Paths.get(clientPathDir.getText(), fileName.getFileName());
 
         FileHeader fileHeader = new FileHeader();
         fileHeader.setClientPath(pathToFile.toString());
@@ -126,12 +148,12 @@ public class ControllerFileManager implements Initializable {
         FileUploadRequest fileUploadRequest = new FileUploadRequest(fileHeader);
         severListener.sendMessage(fileUploadRequest);
 
-        addProgress(clientRoot, "Upload: " + fileName, fileHeader);
+        addProgress(clientRoot, "Upload: " + fileHeader.getFileName(), fileHeader);
     }
 
     public void buttonDownloadOnAction(ActionEvent actionEvent) {
         String fileName = serverFiles.getSelectionModel().getSelectedItem();
-        Path pathToFile = Paths.get(pathDir.getText(), fileName);
+        Path pathToFile = Paths.get(clientPathDir.getText(), fileName);
         FileHeader fileHeader = new FileHeader();
         fileHeader.setClientPath(pathToFile.toString());
 
@@ -145,7 +167,9 @@ public class ControllerFileManager implements Initializable {
                 if(message instanceof FileLoad) {
                     updateClientFileList();
                     FileLoad fileLoad = (FileLoad) message;
-                    removeProgress(serverRoot, fileLoad.getFileHeader());
+                    FileHeader fileHeaderLoad  = fileLoad.getFileHeader();
+                    removeProgress(serverRoot, fileHeaderLoad);
+                    severListener.unRegisterFileLoader(fileHeaderLoad);
                 }
             }));
         } catch (IOException e) {
@@ -154,6 +178,72 @@ public class ControllerFileManager implements Initializable {
         }
         severListener.sendMessage(new FileDownloadRequest(fileHeader));
 
+    }
+
+    private void initializeClientFilesList() {
+        clientFiles.setItems(clientFilesList);
+        clientFiles.setCellFactory(param -> new FileCell());
+
+        clientFiles.setOnMouseClicked(event -> {
+            if (event.getClickCount() == 2) {
+                FileHeader fileHeader = clientFiles.getSelectionModel().getSelectedItem();
+                if(fileHeader.isFolder()) {
+                    if(fileHeader.getFileName().equals("...")) {
+                        clientPathDir.setText(Paths.get(clientPathDir.getText()).getParent().toString());
+                    }else {
+                        clientPathDir.setText(Paths.get(clientPathDir.getText(), fileHeader.getFileName()).toString());
+                    }
+                    updateClientFileList();
+                }
+            }
+        });
+
+        ContextMenu contextMenu = new ContextMenu();
+        MenuItem createDirectory = new MenuItem("Create directory");
+        MenuItem renameFile = new MenuItem("Rename file");
+        MenuItem deleteFile = new MenuItem("Delete file");
+
+        createDirectory.setOnAction((event) -> {
+            try {
+                Files.createDirectory(Paths.get(clientPathDir.getText(), "New folder"));
+                FileHeader fileHeader = new FileHeader("New folder", true, 0);
+                Platform.runLater(() -> {
+                    clientFilesList.add(fileHeader);
+                    clientFiles.layout();
+                    clientFiles.scrollTo(fileHeader);
+                    clientFiles.setEditable(true);
+                    clientFiles.edit(clientFiles.getItems().indexOf(fileHeader));
+                });
+            } catch (IOException e) {
+                logger.error(e);
+                e.printStackTrace();
+            }
+
+        });
+
+        renameFile.setOnAction((event) -> {
+            Platform.runLater(() -> {
+                clientFiles.setEditable(true);
+                clientFiles.edit(clientFiles.getSelectionModel().getSelectedIndex());
+            });
+        });
+
+        deleteFile.setOnAction((event) -> {
+            FileHeader fileName = clientFiles.getSelectionModel().getSelectedItem();
+            if(fileName == null) {
+                return;
+            }
+            try {
+                Files.deleteIfExists(Paths.get(clientPathDir.getText(), fileName.getFileName()));
+                updateClientFileList();
+            } catch (IOException e) {
+                showAlertWindow(e.getMessage());
+                logger.error(e);
+            }
+        });
+
+        contextMenu.getItems().addAll(createDirectory, renameFile, deleteFile);
+        clientFiles.setContextMenu(contextMenu);
     }
 
     private void showAlertWindow(String text) {
@@ -187,5 +277,81 @@ public class ControllerFileManager implements Initializable {
             fileProgressNodes.remove(uuid);
         });
         timeline.play();
+    }
+
+    private class FileCell extends ListCell<FileHeader> {
+        private ImageView imageView = new ImageView();
+        private Image folder = new Image(ControllerFileManager.class.getResourceAsStream("folder.png"));
+        private Image up = new Image(ControllerFileManager.class.getResourceAsStream("up.png"));
+        private final TextField textField = new TextField();
+
+        public FileCell() {
+            imageView.setFitHeight(16);
+            imageView.setFitWidth(16);
+
+            textField.addEventFilter(KeyEvent.KEY_PRESSED, e -> {
+                if (e.getCode() == KeyCode.ESCAPE) {
+                    cancelEdit();
+                }
+            });
+
+            textField.setOnAction(e -> {
+                FileHeader fileHeader = getItem();
+                File oldFile = Paths.get(clientPathDir.getText(), fileHeader.getFileName()).toFile();
+                File newFile = Paths.get(clientPathDir.getText(), textField.getText()).toFile();
+                oldFile.renameTo(newFile);
+                fileHeader.setFileName(textField.getText());
+                setContentDisplay(ContentDisplay.LEFT);
+                updateItem(fileHeader, false);
+                clientFiles.setEditable(false);
+                layout();
+            });
+        }
+
+
+        @Override
+        public void startEdit() {
+            super.startEdit();
+            setGraphic(textField);
+            textField.setText(getItem().getFileName());
+            setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
+            textField.requestFocus();
+            textField.selectAll();
+        }
+
+        @Override
+        public void cancelEdit() {
+            super.cancelEdit();
+            setContentDisplay(ContentDisplay.LEFT);
+            updateItem(getItem(), false);
+            clientFiles.setEditable(false);
+            layout();
+        }
+
+        @Override
+        protected void updateItem(FileHeader item, boolean empty) {
+            super.updateItem(item, empty);
+            if (empty || item == null ) {
+                imageView.setImage(null);
+                setGraphic(imageView);
+                setText(null);
+            } else {
+
+                if (item.isFolder() ) {
+                    if(item.getFileName().equals("...")) {
+                        imageView.setImage(up);
+                    }else{
+                        imageView.setImage(folder);
+                    }
+
+                    setText(String.format("[%s]", item.getFileName()));
+                }else{
+                    imageView.setImage(null);
+                    setText(String.format("%s", item.getFileName()));
+                }
+                setGraphic(imageView);
+            }
+        }
+
     }
 }

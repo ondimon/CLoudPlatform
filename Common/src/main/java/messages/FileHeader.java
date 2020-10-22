@@ -1,9 +1,10 @@
 package messages;
 
+import java.io.Serializable;
 import java.nio.file.Paths;
 import java.util.UUID;
 
-public class FileHeader extends Message {
+public class FileHeader implements Serializable {
 
 
     private UUID uuid;
@@ -12,8 +13,25 @@ public class FileHeader extends Message {
     private String serverPath;
     private long length;
 
+    public boolean isFolder() {
+        return isFolder;
+    }
+
+    public void setFolder(boolean folder) {
+        isFolder = folder;
+    }
+
+    private boolean isFolder;
+
     public FileHeader() {
         uuid = UUID.randomUUID();
+    }
+
+    public FileHeader(String fileName, boolean isFolder, long length) {
+        this();
+        this.fileName = fileName;
+        this.length = length;
+        this.isFolder = isFolder;
     }
 
     public String getClientPath() {
@@ -43,8 +61,8 @@ public class FileHeader extends Message {
         this.length = length;
     }
 
-    private void setFileName(String path) {
-        if(fileName != null) return;
+    public void setFileName(String path) {
+        //if(fileName != null) return;
         fileName = Paths.get(path).getFileName().toString();
     }
 

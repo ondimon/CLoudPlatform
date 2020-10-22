@@ -11,7 +11,7 @@
          <children>
             <ToolBar maxHeight="-Infinity" minHeight="-Infinity" prefHeight="40.0" prefWidth="256.0">
               <items>
-                  <TextField fx:id="pathDir" editable="false" opacity="0.5" prefHeight="25.0" prefWidth="194.0" />
+                  <TextField fx:id="clientPathDir" editable="false" opacity="0.5" prefHeight="25.0" prefWidth="194.0" />
                 <Button maxHeight="1.7976931348623157E308" mnemonicParsing="false" onAction="#directoryChoose" text="..." />
               </items>
             </ToolBar>
@@ -36,7 +36,7 @@
          <children>
             <ToolBar maxHeight="-Infinity" minHeight="-Infinity" prefHeight="40.0" prefWidth="229.0" />
             <Label text="Server files" />
-            <ListView fx:id="serverFiles" VBox.vgrow="ALWAYS" />
+            <ListView fx:id="serverFiles" editable="true" VBox.vgrow="ALWAYS" />
          </children>
       </VBox>
    </children>
