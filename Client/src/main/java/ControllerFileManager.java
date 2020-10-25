@@ -95,6 +95,7 @@ public class ControllerFileManager implements Initializable {
         Platform.runLater(() -> {
             clientFilesList.clear();
             String path = clientPathDir.getText();
+
             if(path.equals("")) {
                 return;
             }
@@ -105,6 +106,7 @@ public class ControllerFileManager implements Initializable {
                 clientFilesList.addAll(fileList);
                 FileHeader fileHeader = new FileHeader("...", true, 0);
                 clientFilesList.add(0, fileHeader);
+
 
             } catch (IOException e) {
                 showAlertWindow(e.getMessage());
@@ -121,10 +123,12 @@ public class ControllerFileManager implements Initializable {
     public void directoryChoose(ActionEvent actionEvent) {
         final DirectoryChooser directoryChooser = new DirectoryChooser();
         directoryChooser.setTitle("Select Directories");
+
         String curDir = clientPathDir.getText();
         if(! curDir.equals("")) {
             directoryChooser.setInitialDirectory(new File(curDir));
         }
+
 
         File dir = directoryChooser.showDialog(clientPathDir.getScene().getWindow());
         if (dir != null) {
