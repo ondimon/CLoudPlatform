@@ -34,9 +34,12 @@
          </children></VBox>
       <VBox fx:id="serverRoot" alignment="TOP_CENTER" HBox.hgrow="ALWAYS">
          <children>
-            <ToolBar maxHeight="-Infinity" minHeight="-Infinity" prefHeight="40.0" prefWidth="229.0" />
+            <ToolBar maxHeight="-Infinity" minHeight="-Infinity" prefHeight="40.0" prefWidth="229.0">
+               <items>
+                  <TextField fx:id="serverPathDir" editable="false" prefHeight="25.0" prefWidth="205.0" />
+               </items></ToolBar>
             <Label text="Server files" />
-            <ListView fx:id="serverFiles" editable="true" VBox.vgrow="ALWAYS" />
+            <ListView fx:id="serverFiles" VBox.vgrow="ALWAYS" />
          </children>
       </VBox>
    </children>

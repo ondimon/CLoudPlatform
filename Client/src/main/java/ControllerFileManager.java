@@ -34,12 +34,14 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class ControllerFileManager implements Initializable {
     private static final Logger logger = LogManager.getLogger(ControllerFileManager.class.getName());
+    private static final String NEW_FOLDER_NAME = "New folder";
 
     private SeverListener severListener;
     private ConcurrentHashMap<UUID, Node> fileProgressNodes = new ConcurrentHashMap<>();
 
     @FXML
-    ListView<String> serverFiles;
+    ListView<FileHeader> serverFiles;
+    final ObservableList<FileHeader> serverFilesList = FXCollections.observableArrayList();
 
     @FXML
     ListView<FileHeader> clientFiles;
@@ -47,6 +49,9 @@ public class ControllerFileManager implements Initializable {
 
     @FXML
     TextField clientPathDir;
+
+    @FXML
+    TextField serverPathDir;
 
     @FXML
     Button buttonUpload;
@@ -63,7 +68,10 @@ public class ControllerFileManager implements Initializable {
     @Override
     public void initialize(URL location, ResourceBundle resources) {
         clientPathDir.setText(System.getProperty("user.home", ""));
+        serverPathDir.setText("");
+
         initializeClientFilesList();
+        initializeServerFilesList();
 
         severListener = SeverListener.getInstance();
         severListener.setCallback(message -> {
@@ -85,10 +93,13 @@ public class ControllerFileManager implements Initializable {
 
     public void updateServerFileList(FileListResponse message) {
         Platform.runLater(() -> {
-                    serverFiles.getItems().clear();
-                    for(String fileName : message.getFileList()) {
-                        serverFiles.getItems().add(fileName);
-                    }});
+            serverFilesList.clear();
+            serverFilesList.addAll(message.getFileList());
+            FileHeader fileHeader = new FileHeader("...", true, 0);
+            serverFilesList.add(0, fileHeader);
+
+            serverPathDir.setText(message.getDirPath());
+        });
     }
 
     public void updateClientFileList() {
@@ -115,7 +126,7 @@ public class ControllerFileManager implements Initializable {
     }
 
     public void sendFileListRequest() {
-        FileListRequest fileListRequest = new FileListRequest();
+        FileListRequest fileListRequest = new FileListRequest(serverPathDir.getText());
         severListener.sendMessage(fileListRequest);
 
     }
@@ -156,12 +167,12 @@ public class ControllerFileManager implements Initializable {
     }
 
     public void buttonDownloadOnAction(ActionEvent actionEvent) {
-        String fileName = serverFiles.getSelectionModel().getSelectedItem();
-        Path pathToFile = Paths.get(clientPathDir.getText(), fileName);
+        FileHeader fileName = serverFiles.getSelectionModel().getSelectedItem();
+        Path pathToFile = Paths.get(clientPathDir.getText(), fileName.getFileName());
         FileHeader fileHeader = new FileHeader();
         fileHeader.setClientPath(pathToFile.toString());
 
-        addProgress(serverRoot, "Download: " + fileName, fileHeader);
+        addProgress(serverRoot, "Download: " + fileName.getFileName(), fileHeader);
 
         FileLoader fileLoader = null;
         try {
@@ -186,7 +197,7 @@ public class ControllerFileManager implements Initializable {
 
     private void initializeClientFilesList() {
         clientFiles.setItems(clientFilesList);
-        clientFiles.setCellFactory(param -> new FileCell());
+        clientFiles.setCellFactory(param -> new FileClientCell(clientFiles));
 
         clientFiles.setOnMouseClicked(event -> {
             if (event.getClickCount() == 2) {
@@ -209,8 +220,8 @@ public class ControllerFileManager implements Initializable {
 
         createDirectory.setOnAction((event) -> {
             try {
-                Files.createDirectory(Paths.get(clientPathDir.getText(), "New folder"));
-                FileHeader fileHeader = new FileHeader("New folder", true, 0);
+                Files.createDirectory(Paths.get(clientPathDir.getText(), NEW_FOLDER_NAME));
+                FileHeader fileHeader = new FileHeader(NEW_FOLDER_NAME, true, 0);
                 Platform.runLater(() -> {
                     clientFilesList.add(fileHeader);
                     clientFiles.layout();
@@ -250,6 +261,56 @@ public class ControllerFileManager implements Initializable {
         clientFiles.setContextMenu(contextMenu);
     }
 
+    private void initializeServerFilesList() {
+        serverFiles.setItems(serverFilesList);
+        serverFiles.setCellFactory(param -> new FileServerCell(serverFiles));
+
+        serverFiles.setOnMouseClicked(event -> {
+            if (event.getClickCount() == 2) {
+                FileHeader fileHeader = serverFiles.getSelectionModel().getSelectedItem();
+                if(fileHeader.isFolder()) {
+//                    if(fileHeader.getFileName().equals("...")) {
+//                        serverPathDir.setText(Paths.get(clientPathDir.getText()).getParent().toString());
+//                    }else {
+//                        serverPathDir.setText(Paths.get(clientPathDir.getText(), fileHeader.getFileName()).toString());
+//                    }
+                    severListener.sendMessage(new FileListRequest(fileHeader.getFileName()));
+                }
+            }
+        });
+
+        ContextMenu contextMenu = new ContextMenu();
+        MenuItem createDirectory = new MenuItem("Create directory");
+        MenuItem renameFile = new MenuItem("Rename file");
+        MenuItem deleteFile = new MenuItem("Delete file");
+
+        createDirectory.setOnAction((event) -> {
+                Platform.runLater(() -> {
+                    FileHeader fileHeader = new FileHeader(NEW_FOLDER_NAME, true, 0);
+                    serverFilesList.add(fileHeader);
+                    serverFiles.layout();
+                    serverFiles.scrollTo(fileHeader);
+                    serverFiles.setEditable(true);
+                    serverFiles.edit(serverFiles.getItems().indexOf(fileHeader));
+                });
+        });
+
+        renameFile.setOnAction((event) -> {
+            Platform.runLater(() -> {
+                serverFiles.setEditable(true);
+                serverFiles.edit(serverFiles.getSelectionModel().getSelectedIndex());
+            });
+        });
+
+        deleteFile.setOnAction((event) -> {
+            String fileName = serverFiles.getSelectionModel().getSelectedItem().getFileName();
+            severListener.sendMessage(new FileDeleteRequest(fileName));
+        });
+
+        contextMenu.getItems().addAll(createDirectory, renameFile, deleteFile);
+        serverFiles.setContextMenu(contextMenu);
+    }
+
     private void showAlertWindow(String text) {
         Alert alert = new Alert(Alert.AlertType.INFORMATION);
         alert.setTitle("Information");
@@ -287,9 +348,10 @@ public class ControllerFileManager implements Initializable {
         private ImageView imageView = new ImageView();
         private Image folder = new Image(ControllerFileManager.class.getResourceAsStream("folder.png"));
         private Image up = new Image(ControllerFileManager.class.getResourceAsStream("up.png"));
-        private final TextField textField = new TextField();
+        protected final TextField textField = new TextField();
+        private ListView<FileHeader> filesList;
 
-        public FileCell() {
+        public FileCell(ListView<FileHeader> filesList) {
             imageView.setFitHeight(16);
             imageView.setFitWidth(16);
 
@@ -299,19 +361,8 @@ public class ControllerFileManager implements Initializable {
                 }
             });
 
-            textField.setOnAction(e -> {
-                FileHeader fileHeader = getItem();
-                File oldFile = Paths.get(clientPathDir.getText(), fileHeader.getFileName()).toFile();
-                File newFile = Paths.get(clientPathDir.getText(), textField.getText()).toFile();
-                oldFile.renameTo(newFile);
-                fileHeader.setFileName(textField.getText());
-                setContentDisplay(ContentDisplay.LEFT);
-                updateItem(fileHeader, false);
-                clientFiles.setEditable(false);
-                layout();
-            });
+            this.filesList = filesList;
         }
-
 
         @Override
         public void startEdit() {
@@ -328,7 +379,7 @@ public class ControllerFileManager implements Initializable {
             super.cancelEdit();
             setContentDisplay(ContentDisplay.LEFT);
             updateItem(getItem(), false);
-            clientFiles.setEditable(false);
+            filesList.setEditable(false);
             layout();
         }
 
@@ -357,5 +408,39 @@ public class ControllerFileManager implements Initializable {
             }
         }
 
+    }
+
+    private class FileClientCell extends FileCell {
+        public FileClientCell(ListView<FileHeader> filesList) {
+            super(filesList);
+            textField.setOnAction(e -> {
+                FileHeader fileHeader = getItem();
+                File oldFile = Paths.get(clientPathDir.getText(), fileHeader.getFileName()).toFile();
+                File newFile = Paths.get(clientPathDir.getText(), textField.getText()).toFile();
+                oldFile.renameTo(newFile);
+                fileHeader.setFileName(textField.getText());
+                setContentDisplay(ContentDisplay.LEFT);
+                updateItem(fileHeader, false);
+                clientFiles.setEditable(false);
+                layout();
+            });
+        }
+    }
+
+    private class FileServerCell extends FileCell {
+        public FileServerCell(ListView<FileHeader> filesList) {
+            super(filesList);
+            textField.setOnAction(e -> {
+                FileHeader fileHeader = getItem();
+                String oldFile = fileHeader.getFileName();
+                String newFile = textField.getText();
+                if(oldFile.equals(NEW_FOLDER_NAME)) {
+                    severListener.sendMessage(new CreateDirectoryRequest(newFile));
+                }else{
+                    severListener.sendMessage(new FileRenameRequest(oldFile, newFile));
+                }
+
+            });
+        }
     }
 }

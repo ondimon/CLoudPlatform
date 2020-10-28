@@ -8,7 +8,9 @@ import io.netty.channel.ChannelInboundHandlerAdapter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -69,13 +71,22 @@ public class MessageServerHandler extends ChannelInboundHandlerAdapter {
             fileLoader.setData(filePart.getData());
         }else if(msg instanceof FileDownloadRequest ) {
             response = fileDownloadRequestHandler((FileDownloadRequest) msg);
+        }else if(msg instanceof CreateDirectoryRequest) {
+            response = createDirectoryRequestHandler((CreateDirectoryRequest) msg);
+        }else if(msg instanceof FileDeleteRequest) {
+            response = fileDeleteRequestHandler((FileDeleteRequest) msg);
+        }else if(msg instanceof FileRenameRequest) {
+            response = fileRenameRequestHandler((FileRenameRequest) msg);
         }
+
         if (response != null) {
             logger.debug("send message" + response.toString());
             ctx.channel().write(response);
         }
 
     }
+
+
 
     @Override
     public void channelReadComplete(ChannelHandlerContext ctx) {
@@ -115,13 +126,25 @@ public class MessageServerHandler extends ChannelInboundHandlerAdapter {
         if(!checkToken(msg)) {
             return null;
         }
-        ArrayList<String> listFiles = FileUtility.getListFiles(server.getUserDir(user));
-        return new FileListResponse(listFiles);
+        String newDir = msg.getDir();
+        Path path;
+        if (newDir.equals("...")) {
+            if(server.getUserCurrentDir(user).equals(server.getUserHomeDir(user))) {
+                path = server.getUserCurrentDir(user);
+            }else{
+                path = server.getUserCurrentDir(user).getParent();
+            }
+        }else{
+            path = server.getUserCurrentDir(user).resolve(newDir);
+        }
+        server.setUserCurrentDir(user, path);
+        ArrayList<FileHeader> listFiles = FileUtility.getListFilesHeader(path);
+        return new FileListResponse(user.getCurrentDir(), listFiles);
     }
 
     private Message fileUploadRequestHandler(FileUploadRequest msg) throws IOException {
         FileHeader fileHeader = msg.getFileHeader();
-        Path path = Paths.get(server.getUserDir(user).toString(), fileHeader.getFileName());
+        Path path = server.getUserCurrentDir(user).resolve(fileHeader.getFileName());
         fileHeader.setServerPath(path.toString());
 
         FileLoader fileLoader = new FileLoader(path, fileHeader);
@@ -132,8 +155,8 @@ public class MessageServerHandler extends ChannelInboundHandlerAdapter {
             channel.writeAndFlush(message);
 
             try {
-                ArrayList<String> listFiles = FileUtility.getListFiles(server.getUserDir(user));
-                channel.writeAndFlush(new FileListResponse(listFiles));
+                ArrayList<FileHeader> listFiles = FileUtility.getListFilesHeader(server.getUserCurrentDir(user));
+                channel.writeAndFlush(new FileListResponse(user.getCurrentDir(), listFiles));
             } catch (IOException e) {
                 logger.error(e);
             }
@@ -147,13 +170,33 @@ public class MessageServerHandler extends ChannelInboundHandlerAdapter {
 
     private Message fileDownloadRequestHandler(FileDownloadRequest msg) {
         FileHeader fileHeader = msg.getFileHeader();
-        Path path = Paths.get(server.getUserDir(user).toString(), fileHeader.getFileName());
+        Path path = server.getUserCurrentDir(user).resolve(fileHeader.getFileName());
         fileHeader.setServerPath(path.toString());
         fileHeader.setLength(path.toFile().length());
 
         FileSender fileSender = new FileSender(path, fileHeader, channel);
         new Thread(fileSender::sendFile).start();
         return new FileDownloadResponse(fileHeader);
+    }
+
+    private Message createDirectoryRequestHandler(CreateDirectoryRequest msg) throws IOException {
+        Path currentDir = server.getUserCurrentDir(user);
+        Files.createDirectory(currentDir.resolve(msg.getDirName()));
+        return new FileListResponse(user.getCurrentDir(), FileUtility.getListFilesHeader(currentDir));
+    }
+
+    private Message fileDeleteRequestHandler(FileDeleteRequest msg) throws IOException {
+        Path currentDir = server.getUserCurrentDir(user);
+        Files.deleteIfExists(currentDir.resolve(msg.getFileName()));
+        return new FileListResponse(user.getCurrentDir(), FileUtility.getListFilesHeader(currentDir));
+    }
+
+    private Object fileRenameRequestHandler(FileRenameRequest msg) throws IOException {
+        Path currentDir = server.getUserCurrentDir(user);
+        File oldFile = currentDir.resolve(msg.getOldName()).toFile();
+        File newFile = currentDir.resolve(msg.getNewName()).toFile();
+        oldFile.renameTo(newFile);
+        return new FileListResponse(user.getCurrentDir(), FileUtility.getListFilesHeader(currentDir));
     }
 
     private boolean checkToken(Message msg) {
@@ -163,7 +206,6 @@ public class MessageServerHandler extends ChannelInboundHandlerAdapter {
     private void registerFileLoader(FileLoader fileLoader) {
         fileLoaders.put(fileLoader.getFileHeader().getUuid(), fileLoader);
     }
-
 
     public void unRegisterFileLoader(FileHeader fileHeader) {
         fileLoaders.remove(fileHeader.getUuid());

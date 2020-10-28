@@ -1,5 +1,6 @@
 apply plugin: 'application'
 
+
 mainClassName = 'Server'
 
 jar {

@@ -1,15 +1,7 @@
 import io.netty.bootstrap.ServerBootstrap;
-import io.netty.channel.ChannelInitializer;
-import io.netty.channel.ChannelPipeline;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
-import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
-import io.netty.handler.codec.serialization.ClassResolvers;
-import io.netty.handler.codec.serialization.ObjectDecoder;
-import io.netty.handler.codec.serialization.ObjectEncoder;
-import io.netty.handler.logging.LogLevel;
-import io.netty.handler.logging.LoggingHandler;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.util.SelfSignedCertificate;
@@ -17,9 +9,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import javax.net.ssl.SSLException;
-import java.io.File;
 import java.io.IOException;
-import java.nio.file.FileSystem;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -102,7 +92,7 @@ public class Server {
     public UUID registerUser(User user) throws IOException {
         UUID uuid = UUID.randomUUID();
         users.put(uuid, user);
-        Path userDir = getUserDir(user);
+        Path userDir = getUserHomeDir(user);
         if(Files.notExists(userDir)) {
             Files.createDirectories(userDir);
         }
@@ -113,9 +103,18 @@ public class Server {
         users.remove(token);
     }
 
-
-    public Path getUserDir(User user) {
+    public Path getUserHomeDir(User user) {
         return Paths.get(root_dir, user.getHomeDir());
+    }
+
+    public Path getUserCurrentDir(User user) {
+        return Paths.get(root_dir, user.getCurrentDir());
+    }
+
+    public void setUserCurrentDir(User user, Path dir) {
+        String currentDir = Paths.get(root_dir).relativize(dir).toString();
+        logger.debug("set current dir " + currentDir);
+        user.setCurrentDir(currentDir);
     }
 
     public AuthService getAuthService() {
