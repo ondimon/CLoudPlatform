@@ -1,5 +1,5 @@
 public interface AuthService {
-    void start();
+    boolean start();
     void stop();
     boolean checkUser(String login, String password);
 }

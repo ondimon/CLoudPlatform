@@ -5,7 +5,7 @@ import messages.FileLoad;
 import callback.Callback;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
@@ -15,19 +15,21 @@ import java.nio.file.Path;
 import java.util.concurrent.ArrayBlockingQueue;
 
 public class FileLoader implements Runnable {
-    private static final Logger logger = LogManager.getLogger(FileLoader.class.getName());
+    private static final Logger LOGGER = LogManager.getLogger(FileLoader.class.getName());
 
-    private Path path;
+    private final Path path;
     private FileHeader fileHeader;
     private long fileLength;
     private long byteLoad;
-    private ArrayBlockingQueue<byte[]> queue;
-    FileChannel fileChannel;
+    private final ArrayBlockingQueue<byte[]> queue;
+    private Callback callback;
+    private final FileChannel fileChannel;
+    private final RandomAccessFile randomAccessFile;
 
     public void setData(byte[] data) {
-       logger.debug("set in queue bytes " + data.length);
+       LOGGER.debug("set in queue bytes {}", data.length);
        while(!queue.offer(data)) {
-           logger.debug("queue is full");
+           LOGGER.debug("queue is full");
        }
     }
 
@@ -39,8 +41,6 @@ public class FileLoader implements Runnable {
         this.fileHeader = fileHeader;
         this.fileLength = fileHeader.getLength();
     }
-
-    private Callback callback;
 
     public void setCallback(Callback callback) {
         this.callback = callback;
@@ -54,36 +54,60 @@ public class FileLoader implements Runnable {
         }
         Files.createFile(path);
         queue = new ArrayBlockingQueue<>(10);
-        this.fileChannel = new RandomAccessFile(path.toFile(), "rw").getChannel();
+
+        try {
+            this.randomAccessFile = new RandomAccessFile(path.toFile(), "rw");
+            this.fileChannel = randomAccessFile.getChannel();
+        } catch (FileNotFoundException e) {
+            closeFile();
+            throw new FileNotFoundException(path.toString());
+        }
     }
 
     @Override
     public void run() {
-        logger.debug("write file " + fileHeader.toString());
+        LOGGER.debug("write file {}", fileHeader);
 
         while (fileLength != byteLoad) {
             byte[] data = queue.poll();
             if(data == null) {
                 continue;
             }
-            logger.debug("get bytes " + data.length + " " + fileHeader.toString());
+            LOGGER.debug("get bytes {} {}", data.length, fileHeader);
 
             try {
                 fileChannel.write(ByteBuffer.wrap(data), fileChannel.size());
                 byteLoad += data.length;
-                logger.debug("byte load " + byteLoad + " in  " + fileLength);
+                LOGGER.debug("byte load {} in {}", byteLoad, fileLength);
 
             } catch (IOException e) {
-              logger.error(e.getMessage());
+                LOGGER.error(e.getMessage(), e);
+                try {
+                    Files.delete(path);
+                } catch (IOException ioException) {
+                    LOGGER.error(ioException.getMessage(), ioException);
+                }
+            } finally {
+                closeFile();
             }
         }
-        try {
-            fileChannel.close();
-        } catch (IOException e) {
-            logger.error(e.getMessage());
-        }
+
+        closeFile();
         if((callback != null)) {
             callback.setMessage(new FileLoad(fileHeader));
+        }
+    }
+
+    private void closeFile() {
+        try {
+            if(fileChannel != null) {
+                fileChannel.close();
+            }
+            if(randomAccessFile != null) {
+                randomAccessFile.close();
+            }
+        } catch (IOException e) {
+            LOGGER.error(e.getMessage());
         }
     }
 }

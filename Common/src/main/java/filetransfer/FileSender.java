@@ -12,7 +12,7 @@ import java.nio.file.Path;
 import java.util.Arrays;
 
 public class FileSender {
-    private static final Logger logger = LogManager.getLogger(FileSender.class.getName());
+    private static final Logger LOGGER = LogManager.getLogger(FileSender.class.getName());
 
     private final Path path;
     private final Channel channel;
@@ -25,22 +25,21 @@ public class FileSender {
     }
 
     public void sendFile() {
-        logger.debug(String.format("start send file %s", fileHeader.getFileName()));
-        logger.debug(String.format("file length %d", fileHeader.getLength()));
+        LOGGER.debug("start send file {}", fileHeader.getFileName());
+        LOGGER.debug("file length {}", fileHeader.getLength());
 
         try (FileChannel fileChannel = new FileInputStream(path.toFile()).getChannel()) {
               ByteBuffer buffer = ByteBuffer.allocate(1024 * 100);
-              int byteread;
-              while ((byteread = fileChannel.read(buffer)) != -1) {
+              int byteRead;
+              while ((byteRead = fileChannel.read(buffer)) != -1) {
                   buffer.flip();
                   byte[] data = buffer.array();
-                  channel.writeAndFlush(new FilePart(fileHeader,  Arrays.copyOf(data, byteread))).sync();
-                  logger.debug(String.format("send %d", byteread));
+                  channel.writeAndFlush(new FilePart(fileHeader,  Arrays.copyOf(data, byteRead))).sync();
+                  LOGGER.debug("send {}", byteRead);
                   buffer.clear();
                }
             } catch (Exception e) {
-                logger.error(e);
-                e.printStackTrace();
+                LOGGER.error(e.getMessage(), e);
             }
     }
 

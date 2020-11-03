@@ -14,11 +14,15 @@ import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 import io.netty.handler.stream.ChunkedWriteHandler;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import javax.net.ssl.SSLException;
 import java.util.UUID;
 
 public class SeverListener implements Runnable  {
+    private static final Logger LOGGER = LogManager.getLogger(SeverListener.class.getName());
+
     static final boolean SSL = System.getProperty("ssl") != null;
     static final String HOST = System.getProperty("host", "127.0.0.1");
     static final int PORT = Integer.parseInt(System.getProperty("port", "8189"));
@@ -36,6 +40,7 @@ public class SeverListener implements Runnable  {
         }
         return severListener;
     }
+
     private SeverListener(){
 
     }
@@ -77,10 +82,8 @@ public class SeverListener implements Runnable  {
                 sslCtx = SslContextBuilder.forClient()
                         .trustManager(InsecureTrustManagerFactory.INSTANCE).build();
             } catch (SSLException e) {
-                e.printStackTrace();
+                LOGGER.error(e.getMessage(), e);
             }
-        } else {
-            sslCtx = null;
         }
         final SslContext sslCtx1 = sslCtx;
         group = new NioEventLoopGroup();
@@ -90,7 +93,7 @@ public class SeverListener implements Runnable  {
                     .channel(NioSocketChannel.class)
                     .handler(new ChannelInitializer<SocketChannel>() {
                         @Override
-                        public void initChannel(SocketChannel ch) throws Exception {
+                        public void initChannel(SocketChannel ch)  {
                             ChannelPipeline p = ch.pipeline();
                             if (sslCtx1 != null) {
                                 p.addLast(sslCtx1.newHandler(ch.alloc(), HOST, PORT));
@@ -110,7 +113,8 @@ public class SeverListener implements Runnable  {
             ch.closeFuture().sync();
 
         } catch (InterruptedException e) {
-            e.printStackTrace();
+            LOGGER.error(e.getMessage(), e);
+            Thread.currentThread().interrupt();
         } finally {
             group.shutdownGracefully();
         }

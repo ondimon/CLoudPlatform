@@ -11,19 +11,16 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-
-import java.io.IOException;
-import java.net.URISyntaxException;
 import java.nio.file.Paths;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class MessageClientHandler extends ChannelInboundHandlerAdapter {
-    private static final Logger logger = LogManager.getLogger(MessageClientHandler.class.getName());
+    private static final Logger LOGGER = LogManager.getLogger(MessageClientHandler.class.getName());
 
     private Channel channel;
     private Callback callback;
-    private ConcurrentHashMap<UUID, FileLoader> fileLoaders = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<UUID, FileLoader> fileLoaders = new ConcurrentHashMap<>();
 
     public void setCallback(Callback callback) {
         this.callback = callback;
@@ -42,14 +39,11 @@ public class MessageClientHandler extends ChannelInboundHandlerAdapter {
         channel = ctx.channel();
     }
 
-    @Override
-    public void channelActive(ChannelHandlerContext ctx) throws IOException {
-
-    }
 
     @Override
-    public void channelRead(ChannelHandlerContext ctx, Object msg) throws URISyntaxException, IOException {
-        logger.debug("get message" + msg.toString());
+    public void channelRead(ChannelHandlerContext ctx, Object msg) {
+        String logMessage = String.format("get message %s", msg.toString());
+        LOGGER.debug(logMessage);
 
         if (msg instanceof FileUploadResponse ) {
             FileUploadResponse fileUploadResponse = (FileUploadResponse) msg;
@@ -80,7 +74,7 @@ public class MessageClientHandler extends ChannelInboundHandlerAdapter {
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-        cause.printStackTrace();
+        LOGGER.error(cause.getMessage(), cause);
         ctx.close();
     }
 }

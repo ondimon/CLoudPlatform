@@ -62,7 +62,6 @@ public class FileHeader implements Serializable {
     }
 
     public void setFileName(String path) {
-        //if(fileName != null) return;
         fileName = Paths.get(path).getFileName().toString();
     }
 

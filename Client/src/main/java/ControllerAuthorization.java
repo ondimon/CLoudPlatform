@@ -1,3 +1,4 @@
+import javafx.event.ActionEvent;
 import messages.LoginRequest;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
@@ -32,7 +33,7 @@ public class ControllerAuthorization implements Initializable {
                 LoginResponse messageLogin = (LoginResponse) message;
                 if (messageLogin.isLoginSuccess()) {
                     severListener.setToken(messageLogin.getToken());
-                    loadFileScreen(messageLogin);
+                    loadFileScreen();
                 }else{
                     Platform.runLater(() -> showAlertWindow("Invalid login or password"));
 
@@ -43,17 +44,14 @@ public class ControllerAuthorization implements Initializable {
         Platform.runLater(() -> loginField.requestFocus());
     }
 
-    public void logIn(javafx.event.ActionEvent actionEvent) {
+    public void logIn(ActionEvent actionEvent) {
         String login = loginField.getText();
         String pass = passwordField.getText();
-        LoginRequest messageLogin = new LoginRequest(login, pass);
-        severListener.sendMessage(messageLogin);
+        severListener.sendMessage(new LoginRequest(login, pass));
     }
 
-    public void loadFileScreen(LoginResponse messageLogin) {
-        Platform.runLater(new Runnable() {
-            @Override
-            public void run() {
+    public void loadFileScreen() {
+        Platform.runLater(() -> {
                 try {
                     loginField.getScene().getWindow().hide();
 
@@ -62,7 +60,6 @@ public class ControllerAuthorization implements Initializable {
 
                     FXMLLoader loader = new FXMLLoader(getClass().getResource("FileManager.fxml"));
                     Parent window = loader.load();
-                    //ControllerFileManager controllerFileManager = loader.getController();
 
                     Scene scene = new Scene(window);
 
@@ -77,7 +74,6 @@ public class ControllerAuthorization implements Initializable {
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
-            }
         });
     }
 

@@ -12,19 +12,18 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 
 public class MessageServerHandler extends ChannelInboundHandlerAdapter {
-    private static final Logger logger = LogManager.getLogger(MessageServerHandler.class.getName());
+    private static final Logger LOGGER = LogManager.getLogger(MessageServerHandler.class.getName());
 
-    private Server server;
+    private final Server server;
     private UUID token;
     private User user;
-    private ConcurrentHashMap<UUID, FileLoader> fileLoaders = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<UUID, FileLoader> fileLoaders = new ConcurrentHashMap<>();
     private Channel channel;
 
     public MessageServerHandler(Server server) {
@@ -39,28 +38,24 @@ public class MessageServerHandler extends ChannelInboundHandlerAdapter {
     @Override
     public void channelInactive(ChannelHandlerContext ctx) throws Exception {
         super.channelInactive(ctx);
-        logger.info("user disconnect");
+        LOGGER.info("user disconnect");
         if(token != null) {
             server.unregisterUser(token);
         }
     }
 
-    public void setServer(Server server) {
-        this.server = server;
-    }
-
     @Override
-    public void channelActive(ChannelHandlerContext ctx) throws Exception {
-        logger.info("user connect");
+    public void channelActive(ChannelHandlerContext ctx) {
+        LOGGER.info("user connect");
     }
 
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
         Object response = null;
-        logger.debug("get message " + msg.toString());
+        LOGGER.debug("get message {}", msg);
 
         if(msg instanceof LoginRequest ) {
-            response = userLogin(ctx, (LoginRequest) msg);
+            response = loginRequestHandler((LoginRequest) msg);
         }else if (msg instanceof FileListRequest ) {
             response  = getFileListHandler((FileListRequest) msg);
         }else if(msg instanceof FileUploadRequest) {
@@ -80,7 +75,7 @@ public class MessageServerHandler extends ChannelInboundHandlerAdapter {
         }
 
         if (response != null) {
-            logger.debug("send message" + response.toString());
+            LOGGER.debug("send message {}", response);
             ctx.channel().write(response);
         }
 
@@ -95,22 +90,21 @@ public class MessageServerHandler extends ChannelInboundHandlerAdapter {
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-        cause.printStackTrace();
-        logger.error(cause.getMessage());
+        LOGGER.error(cause.getMessage(), cause);
         if(token != null) {
             server.unregisterUser(token);
         }
         ctx.close();
     }
 
-    private Message userLogin(ChannelHandlerContext ctx, LoginRequest msg) throws IOException {
-        logger.info(String.format("user login: %s", msg.getLogin()));
+    private Message loginRequestHandler(LoginRequest msg) throws IOException {
+        LOGGER.info("user login: {}", msg.getLogin());
         AuthService authService = server.getAuthService();
         String login = msg.getLogin();
         String pass = msg.getPassword();
         boolean userChecked = authService.checkUser(login, pass);
 
-        logger.info(String.format("user login success: %b", userChecked));
+        LOGGER.info("user login success: {}", userChecked);
         LoginResponse loginResponse = new LoginResponse();
         loginResponse.setLoginSuccess(userChecked);
         if (userChecked) {
@@ -138,7 +132,7 @@ public class MessageServerHandler extends ChannelInboundHandlerAdapter {
             path = server.getUserCurrentDir(user).resolve(newDir);
         }
         server.setUserCurrentDir(user, path);
-        ArrayList<FileHeader> listFiles = FileUtility.getListFilesHeader(path);
+        List<FileHeader> listFiles = FileUtility.getListFilesHeader(path);
         return new FileListResponse(user.getCurrentDir(), listFiles);
     }
 
@@ -148,17 +142,17 @@ public class MessageServerHandler extends ChannelInboundHandlerAdapter {
         fileHeader.setServerPath(path.toString());
 
         FileLoader fileLoader = new FileLoader(path, fileHeader);
-        fileLoader.setCallback((message) ->{
+        fileLoader.setCallback(message ->{
             FileLoad fileLoad = (FileLoad) message;
             FileHeader fileHeaderLoad  = fileLoad.getFileHeader();
             unRegisterFileLoader(fileHeaderLoad);
             channel.writeAndFlush(message);
 
             try {
-                ArrayList<FileHeader> listFiles = FileUtility.getListFilesHeader(server.getUserCurrentDir(user));
+                List<FileHeader> listFiles = FileUtility.getListFilesHeader(server.getUserCurrentDir(user));
                 channel.writeAndFlush(new FileListResponse(user.getCurrentDir(), listFiles));
             } catch (IOException e) {
-                logger.error(e);
+                LOGGER.error(e);
             }
 
         });
