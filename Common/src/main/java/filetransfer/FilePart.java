@@ -3,13 +3,11 @@ package filetransfer;
 import messages.FileHeader;
 import messages.Message;
 
-import java.io.IOException;
-
 public class FilePart extends Message {
 
 
-    private FileHeader fileHeader;
-    private byte[] data;
+    private final FileHeader fileHeader;
+    private final byte[] data;
 
 
     public byte[] getData() {
@@ -20,7 +18,7 @@ public class FilePart extends Message {
         return fileHeader;
     }
 
-    public FilePart(FileHeader fileHeader, byte[] data) throws IOException {
+    public FilePart(FileHeader fileHeader, byte[] data) {
         this.fileHeader = fileHeader;
         this.data = data;
     }

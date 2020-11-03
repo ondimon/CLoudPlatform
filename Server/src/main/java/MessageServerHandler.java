@@ -8,21 +8,22 @@ import io.netty.channel.ChannelInboundHandlerAdapter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 
 public class MessageServerHandler extends ChannelInboundHandlerAdapter {
-    private static final Logger logger = LogManager.getLogger(MessageServerHandler.class.getName());
+    private static final Logger LOGGER = LogManager.getLogger(MessageServerHandler.class.getName());
 
-    private Server server;
+    private final Server server;
     private UUID token;
     private User user;
-    private ConcurrentHashMap<UUID, FileLoader> fileLoaders = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<UUID, FileLoader> fileLoaders = new ConcurrentHashMap<>();
     private Channel channel;
 
     public MessageServerHandler(Server server) {
@@ -37,28 +38,24 @@ public class MessageServerHandler extends ChannelInboundHandlerAdapter {
     @Override
     public void channelInactive(ChannelHandlerContext ctx) throws Exception {
         super.channelInactive(ctx);
-        logger.info("user disconnect");
+        LOGGER.info("user disconnect");
         if(token != null) {
             server.unregisterUser(token);
         }
     }
 
-    public void setServer(Server server) {
-        this.server = server;
-    }
-
     @Override
-    public void channelActive(ChannelHandlerContext ctx) throws Exception {
-        logger.info("user connect");
+    public void channelActive(ChannelHandlerContext ctx) {
+        LOGGER.info("user connect");
     }
 
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
         Object response = null;
-        logger.debug("get message " + msg.toString());
+        LOGGER.debug("get message {}", msg);
 
         if(msg instanceof LoginRequest ) {
-            response = userLogin(ctx, (LoginRequest) msg);
+            response = loginRequestHandler((LoginRequest) msg);
         }else if (msg instanceof FileListRequest ) {
             response  = getFileListHandler((FileListRequest) msg);
         }else if(msg instanceof FileUploadRequest) {
@@ -69,9 +66,16 @@ public class MessageServerHandler extends ChannelInboundHandlerAdapter {
             fileLoader.setData(filePart.getData());
         }else if(msg instanceof FileDownloadRequest ) {
             response = fileDownloadRequestHandler((FileDownloadRequest) msg);
+        }else if(msg instanceof CreateDirectoryRequest) {
+            response = createDirectoryRequestHandler((CreateDirectoryRequest) msg);
+        }else if(msg instanceof FileDeleteRequest) {
+            response = fileDeleteRequestHandler((FileDeleteRequest) msg);
+        }else if(msg instanceof FileRenameRequest) {
+            response = fileRenameRequestHandler((FileRenameRequest) msg);
         }
+
         if (response != null) {
-            logger.debug("send message" + response.toString());
+            LOGGER.debug("send message {}", response);
             ctx.channel().write(response);
         }
 
@@ -86,22 +90,21 @@ public class MessageServerHandler extends ChannelInboundHandlerAdapter {
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-        cause.printStackTrace();
-        logger.error(cause.getMessage());
+        LOGGER.error(cause.getMessage(), cause);
         if(token != null) {
             server.unregisterUser(token);
         }
         ctx.close();
     }
 
-    private Message userLogin(ChannelHandlerContext ctx, LoginRequest msg) throws IOException {
-        logger.info(String.format("user login: %s", msg.getLogin()));
+    private Message loginRequestHandler(LoginRequest msg) throws IOException {
+        LOGGER.info("user login: {}", msg.getLogin());
         AuthService authService = server.getAuthService();
         String login = msg.getLogin();
         String pass = msg.getPassword();
         boolean userChecked = authService.checkUser(login, pass);
 
-        logger.info(String.format("user login success: %b", userChecked));
+        LOGGER.info("user login success: {}", userChecked);
         LoginResponse loginResponse = new LoginResponse();
         loginResponse.setLoginSuccess(userChecked);
         if (userChecked) {
@@ -117,21 +120,41 @@ public class MessageServerHandler extends ChannelInboundHandlerAdapter {
         if(!checkToken(msg)) {
             return null;
         }
-        ArrayList<String> listFiles = FileUtility.getListFiles(server.getUserDir(user));
-        return new FileListResponse(listFiles);
+        String newDir = msg.getDir();
+        Path path;
+        if (newDir.equals("...")) {
+            if(server.getUserCurrentDir(user).equals(server.getUserHomeDir(user))) {
+                path = server.getUserCurrentDir(user);
+            }else{
+                path = server.getUserCurrentDir(user).getParent();
+            }
+        }else{
+            path = server.getUserCurrentDir(user).resolve(newDir);
+        }
+        server.setUserCurrentDir(user, path);
+        List<FileHeader> listFiles = FileUtility.getListFilesHeader(path);
+        return new FileListResponse(user.getCurrentDir(), listFiles);
     }
 
     private Message fileUploadRequestHandler(FileUploadRequest msg) throws IOException {
         FileHeader fileHeader = msg.getFileHeader();
-        Path path = Paths.get(server.getUserDir(user).toString(), fileHeader.getFileName());
+        Path path = server.getUserCurrentDir(user).resolve(fileHeader.getFileName());
         fileHeader.setServerPath(path.toString());
 
         FileLoader fileLoader = new FileLoader(path, fileHeader);
-        fileLoader.setCallback((message) ->{
+        fileLoader.setCallback(message ->{
             FileLoad fileLoad = (FileLoad) message;
             FileHeader fileHeaderLoad  = fileLoad.getFileHeader();
             unRegisterFileLoader(fileHeaderLoad);
             channel.writeAndFlush(message);
+
+            try {
+                List<FileHeader> listFiles = FileUtility.getListFilesHeader(server.getUserCurrentDir(user));
+                channel.writeAndFlush(new FileListResponse(user.getCurrentDir(), listFiles));
+            } catch (IOException e) {
+                LOGGER.error(e);
+            }
+
         });
         new Thread(fileLoader).start();
         registerFileLoader(fileLoader);
@@ -141,7 +164,7 @@ public class MessageServerHandler extends ChannelInboundHandlerAdapter {
 
     private Message fileDownloadRequestHandler(FileDownloadRequest msg) {
         FileHeader fileHeader = msg.getFileHeader();
-        Path path = Paths.get(server.getUserDir(user).toString(), fileHeader.getFileName());
+        Path path = server.getUserCurrentDir(user).resolve(fileHeader.getFileName());
         fileHeader.setServerPath(path.toString());
         fileHeader.setLength(path.toFile().length());
 
@@ -150,49 +173,25 @@ public class MessageServerHandler extends ChannelInboundHandlerAdapter {
         return new FileDownloadResponse(fileHeader);
     }
 
-//    private Messages.Message getFileResponseHandler(ChannelHandlerContext ctx, FileResponse msg) {
-//        try {
-//            Path path = Paths.get(server.getUserDir(user).toString(), msg.getFileName());
-//            logger.debug(path.toString());
-//            byte[] data = msg.getData();
-//            ByteBuffer byteBuffer= ByteBuffer.wrap(data);
-//
-//            logger.debug(data.length);
-//
-////            Set<StandardOpenOption> options = new HashSet<>();
-////            options.add(StandardOpenOption.CREATE);
-////            options.add(StandardOpenOption.APPEND);
-////            FileChannel fileChannel = FileChannel.open(path, options);
-////            fileChannel.write(byteBuffer);
-////            fileChannel.close();
-//
-//            if(Files.notExists(path)) {
-//                logger.debug("create file");
-//                Files.createFile(path);
-//           }
-//            RandomAccessFile randomAccessFile = new RandomAccessFile(path.toFile(), "rw");
-//            FileChannel fileChannel = randomAccessFile.getChannel();
-//
-//            while (byteBuffer.hasRemaining()){;
-//                fileChannel.position(path.toFile().length());
-//                fileChannel.write(byteBuffer);
-//            }
-//
-//            fileChannel.close();
-//            randomAccessFile.close();
-//
-////            try (FileChannel channel = new RandomAccessFile(path.toFile(), "rw").getChannel()) {
-////                logger.debug("write file");
-////                channel.write(ByteBuffer.wrap(msg.getData()), channel.size());
-////            }
-////            Files.write(path,
-////                        msg.getData(),
-////                        StandardOpenOption.APPEND);
-//        } catch (Exception e) {
-//           logger.error(e);
-//        }
-//        return null;
-//    }
+    private Message createDirectoryRequestHandler(CreateDirectoryRequest msg) throws IOException {
+        Path currentDir = server.getUserCurrentDir(user);
+        Files.createDirectory(currentDir.resolve(msg.getDirName()));
+        return new FileListResponse(user.getCurrentDir(), FileUtility.getListFilesHeader(currentDir));
+    }
+
+    private Message fileDeleteRequestHandler(FileDeleteRequest msg) throws IOException {
+        Path currentDir = server.getUserCurrentDir(user);
+        Files.deleteIfExists(currentDir.resolve(msg.getFileName()));
+        return new FileListResponse(user.getCurrentDir(), FileUtility.getListFilesHeader(currentDir));
+    }
+
+    private Object fileRenameRequestHandler(FileRenameRequest msg) throws IOException {
+        Path currentDir = server.getUserCurrentDir(user);
+        File oldFile = currentDir.resolve(msg.getOldName()).toFile();
+        File newFile = currentDir.resolve(msg.getNewName()).toFile();
+        oldFile.renameTo(newFile);
+        return new FileListResponse(user.getCurrentDir(), FileUtility.getListFilesHeader(currentDir));
+    }
 
     private boolean checkToken(Message msg) {
         return msg.getToken().equals(token);
@@ -201,7 +200,6 @@ public class MessageServerHandler extends ChannelInboundHandlerAdapter {
     private void registerFileLoader(FileLoader fileLoader) {
         fileLoaders.put(fileLoader.getFileHeader().getUuid(), fileLoader);
     }
-
 
     public void unRegisterFileLoader(FileHeader fileHeader) {
         fileLoaders.remove(fileHeader.getUuid());

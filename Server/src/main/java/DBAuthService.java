@@ -1,46 +1,58 @@
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.io.IOException;
 import java.sql.*;
+import java.util.Properties;
 
 public class DBAuthService implements AuthService{
-    private static final Logger logger = LogManager.getLogger(Server.class.getName());
+    private static final Logger LOGGER = LogManager.getLogger(DBAuthService.class.getName());
     Connection connection ;
 
     @Override
-    public void start() {
-        logger.info("Start auth service");
+    public boolean start() {
+        LOGGER.info("Start auth service");
         try {
             Class.forName("org.sqlite.JDBC");
-            this.connection = DriverManager.getConnection("jdbc:sqlite:./data/Cloud.db");
-        } catch (ClassNotFoundException | SQLException e) {
-            logger.error(e.getMessage());
-        }
 
+            Properties properties = new Properties();
+            properties.load(this.getClass().getResourceAsStream("config.properties"));
+
+            String url = properties.getProperty("db.url");
+            String login = properties.getProperty("db.user");
+            String password = properties.getProperty("db.password");
+
+            this.connection = DriverManager.getConnection(url, login, password);
+        } catch (ClassNotFoundException | SQLException | IOException e) {
+            LOGGER.error(e.getMessage(), e);
+            return false;
+        }
+        return true;
     }
 
     @Override
     public void stop() {
-        logger.info("Stop auth service");
+        LOGGER.info("Stop auth service");
         try {
             connection.close();
         } catch (SQLException e) {
-            logger.error(e.getMessage());
+            LOGGER.error(e.getMessage());
         }
     }
 
     @Override
     public boolean checkUser(String login, String password) {
         String query = String.format("select * from users where Login = '%s' and  Password = '%s'", login, password);
-        logger.debug("get nick by login");
-        logger.debug(String.format("query: %s", query.replace(password, "*****")));
+        LOGGER.debug("get nick by login");
+        String message = String.format("query: %s", query.replace(password, "*****"));
+        LOGGER.debug(message);
         try(Statement statement = connection.createStatement();
             ResultSet rs = statement.executeQuery(query)) {
             if (rs.next()) {
                 return true;
             }
         } catch (SQLException e) {
-            logger.error(e.getMessage());
+            LOGGER.error(e.getMessage(), e);
         }
         return false;
     }
