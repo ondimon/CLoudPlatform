@@ -42,3 +42,4 @@ target/
 build/
 logs/
 data/
+.idea/sonarlint-state.xml
