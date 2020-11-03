@@ -189,7 +189,9 @@ public class MessageServerHandler extends ChannelInboundHandlerAdapter {
         Path currentDir = server.getUserCurrentDir(user);
         File oldFile = currentDir.resolve(msg.getOldName()).toFile();
         File newFile = currentDir.resolve(msg.getNewName()).toFile();
-        oldFile.renameTo(newFile);
+        if(!oldFile.renameTo(newFile)) {
+            LOGGER.error("Cannot rename file {}", oldFile);
+        }
         return new FileListResponse(user.getCurrentDir(), FileUtility.getListFilesHeader(currentDir));
     }
 

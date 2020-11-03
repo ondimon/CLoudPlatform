@@ -409,8 +409,9 @@ public class ControllerFileManager implements Initializable {
                 FileHeader fileHeader = getItem();
                 File oldFile = Paths.get(clientPathDir.getText(), fileHeader.getFileName()).toFile();
                 File newFile = Paths.get(clientPathDir.getText(), textField.getText()).toFile();
-                oldFile.renameTo(newFile);
-                fileHeader.setFileName(textField.getText());
+                if(oldFile.renameTo(newFile)) {
+                    fileHeader.setFileName(textField.getText());
+                }
                 setContentDisplay(ContentDisplay.LEFT);
                 updateItem(fileHeader, false);
                 clientFiles.setEditable(false);

@@ -1,4 +1,5 @@
 import javafx.event.ActionEvent;
+import javafx.scene.control.Button;
 import messages.LoginRequest;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
@@ -24,6 +25,8 @@ public class ControllerAuthorization implements Initializable {
 
     @FXML
     public PasswordField passwordField;
+    @FXML
+    public Button loginButton;
 
     @Override
     public void initialize(URL location, ResourceBundle resources) {
@@ -40,8 +43,9 @@ public class ControllerAuthorization implements Initializable {
                 }
             }
         });
+        loginButton.setOnAction(event -> logIn(event));
 
-        Platform.runLater(() -> loginField.requestFocus());
+        Platform.runLater(loginField::requestFocus);
     }
 
     public void logIn(ActionEvent actionEvent) {
@@ -72,7 +76,7 @@ public class ControllerAuthorization implements Initializable {
                     stage.show();
 
                 } catch (IOException e) {
-                    e.printStackTrace();
+                    Platform.runLater(() -> showAlertWindow(e.getMessage()));
                 }
         });
     }

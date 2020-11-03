@@ -20,7 +20,7 @@
             </Label>
             <TextField fx:id="loginField" layoutX="63.0" layoutY="81.0" prefHeight="25.0" prefWidth="266.0" />
             <PasswordField fx:id="passwordField" layoutX="64.0" layoutY="143.0" prefHeight="25.0" prefWidth="266.0" />
-            <Button fx:id="loginButton" layoutX="115.0" layoutY="188.0" mnemonicParsing="false" onAction="#logIn" prefHeight="25.0" prefWidth="165.0" text="LOG IN">
+            <Button fx:id="loginButton" layoutX="115.0" layoutY="188.0" mnemonicParsing="false" prefHeight="25.0" prefWidth="165.0" text="LOG IN">
                <font>
                   <Font name="System Bold" size="18.0" />
                </font>
